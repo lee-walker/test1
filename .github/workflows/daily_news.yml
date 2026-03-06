@@ -64,10 +64,11 @@ jobs:
           curl -X POST "${BARK_URL}" \
             -H "Content-Type: application/json; charset=utf-8" \
             -d @- <<EOF
-            {
-              "title": "今日新闻摘要",
-              "body": $(echo "$SUMMARY" | jq -Rs .),
-              "group": "News",
-              "url": "https://news.google.com/"
-            }
-EOF
+          {
+            "title": "今日新闻摘要",
+            "body": $(echo "$SUMMARY" | jq -Rs .),
+            "group": "News",
+            "url": "https://news.google.com/"
+          }
+          EOF
+
