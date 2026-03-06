@@ -61,7 +61,6 @@ jobs:
           BARK_URL: ${{ secrets.BARK_URL }}
           SUMMARY: ${{ env.SUMMARY }}
         run: |
-          # 发送 POST 请求
           curl -X POST "${BARK_URL}" \
             -H "Content-Type: application/json; charset=utf-8" \
             -d @- <<EOF
