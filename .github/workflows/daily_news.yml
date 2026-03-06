@@ -1,0 +1,73 @@
+name: Daily News Summary
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天北京时间早上 8:00 (UTC 0:00)
+  workflow_dispatch:
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python Dependencies
+        run: pip install feedparser
+
+      - name: Fetch Raw News
+        run: python fetch_news.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Gemini CLI
+        run: npm install -g @google/gemini-cli
+
+      - name: Generate News Summary with Gemini
+        id: gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          PROMPT="请分析以下每日新闻 JSON 数据，以中文形式概要总结每日新闻。
+          重点关注：国际事实、股市、热门新闻。
+          要求：
+          1. 最多 20 条。
+          2. 每条内容包含简短的概要总结和新闻原文链接。
+          3. 格式清晰，适合在 Bark App 上阅读。
+          
+          数据如下：
+          $(cat news_data.json)"
+          
+          # 运行 gemini cli 并将输出保存到文件
+          gemini "$PROMPT" > summary.txt
+          
+          # 将结果处理为单行字符串，方便后续 curl 发送（处理换行符）
+          # 也可以直接发送文件内容，Bark URL 支持 POST
+          SUMMARY=$(cat summary.txt)
+          echo "SUMMARY<<EOF" >> $GITHUB_ENV
+          echo "$SUMMARY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Push to Bark
+        env:
+          BARK_URL: ${{ secrets.BARK_URL }}
+        run: |
+          # 发送 POST 请求
+          curl -X POST "${BARK_URL}" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -d @- <<EOF
+            {
+              "title": "今日新闻摘要",
+              "body": $(echo "$SUMMARY" | jq -Rs .),
+              "group": "News",
+              "url": "https://news.google.com/"
+            }
+EOF
