@@ -59,6 +59,7 @@ jobs:
       - name: Push to Bark
         env:
           BARK_URL: ${{ secrets.BARK_URL }}
+          SUMMARY: ${{ env.SUMMARY }}
         run: |
           # 发送 POST 请求
           curl -X POST "${BARK_URL}" \
