@@ -37,16 +37,19 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           PROMPT="请分析以下每日新闻 JSON 数据，以中文形式概要总结每日新闻。
-          重点关注：国际事实、股市、热门新闻。
-          要求：
-          1. 最多 20 条。
-          2. 每条内容包含简短的概要总结和新闻原文链接。
-          3. 格式清晰，适合在 Bark App 上阅读。
+          重点关注：人工智能（AI）、网络安全（Cybersecurity）、国际局势、股市、热门科技动态。
+          
+          格式要求：
+          1. 精选 15 条最重要的新闻。
+          2. 每条新闻格式：[新闻标题](原文链接) - 简短摘要（不超过30字）。
+          3. 分类列出（例如：[AI 领域]、[网络安全]、[国际新闻]）。
+          4. 不要直接显示网址明文，标题必须嵌入链接。
+          5. 全文保持简洁，适合在手机 Bark App 上一屏预览。
           
           数据如下：
           $(cat news_data.json)"
           
-          # 尝试使用最新的 gemini-3-flash 模型，并增加重试逻辑
+          # 使用 gemini-3-flash-preview 模型，增加重试逻辑
           for i in {1..3}; do
             gemini --model gemini-3-flash-preview "$PROMPT" > summary.txt && break || {
               echo "Gemini API call failed, retrying in 30s... ($i/3)"
