@@ -39,28 +39,33 @@ jobs:
           PROMPT="请分析以下每日新闻 JSON 数据，以中文形式概要总结每日新闻。
           重点关注：人工智能（AI）、网络安全（Cybersecurity）、国际局势、股市、热门科技动态。
           
-          格式要求：
-          1. 精选 15 条最重要的新闻。
-          2. 每条新闻格式：[新闻标题](原文链接) - 简短摘要（不超过30字）。
-          3. 分类列出（例如：[AI 领域]、[网络安全]、[国际新闻]）。
-          4. 不要直接显示网址明文，标题必须嵌入链接。
-          5. 全文保持简洁，适合在手机 Bark App 上一屏预览。
+          输出要求：
+          请直接输出一个 JSON 列表，列表中的每个对象包含以下字段：
+          - category: 新闻类别（如：AI 领域、网络安全、国际新闻、股市动态、热门科技）
+          - title: 新闻标题
+          - link: 原文链接
+          - summary: 简短摘要（不超过30字）
+          
+          精选 15 条最重要的新闻。不要输出任何除了 JSON 以外的文字。不要包含 markdown 的 \`\`\`json 块，直接输出内容。
           
           数据如下：
           $(cat news_data.json)"
           
           # 使用 gemini-3-flash-preview 模型，增加重试逻辑
           for i in {1..3}; do
-            gemini --model gemini-3-flash-preview "$PROMPT" > summary.txt && break || {
+            gemini --model gemini-3-flash-preview "$PROMPT" > summary.json && break || {
               echo "Gemini API call failed, retrying in 30s... ($i/3)"
               sleep 30
             }
           done
 
-          if [ ! -s summary.txt ]; then
+          if [ ! -s summary.json ]; then
             echo "Failed to generate summary after 3 retries."
             exit 1
           fi
+          
+          # Format the JSON summary into the desired Markdown format
+          python format_summary.py summary.json > summary.txt
           
           SUMMARY=$(cat summary.txt)
           echo "SUMMARY<<EOF" >> $GITHUB_ENV
@@ -70,16 +75,17 @@ jobs:
       - name: Push to Bark
         env:
           BARK_URL: ${{ secrets.BARK_URL }}
-          SUMMARY: ${{ env.SUMMARY }}
         run: |
+          SUMMARY=$(cat summary.txt)
+          # 使用 jq 构造完整的 JSON 负载，并确保 Markdown 中的换行符被正确转义
+          PAYLOAD=$(jq -n \
+            --arg title "今日新闻摘要" \
+            --arg body "$SUMMARY" \
+            --arg group "News" \
+            --arg url "https://news.google.com/" \
+            '{title: $title, body: $body, group: $group, url: $url}')
+          
           curl -X POST "${BARK_URL}" \
             -H "Content-Type: application/json; charset=utf-8" \
-            -d @- <<EOF
-          {
-            "title": "今日新闻摘要",
-            "body": $(echo "$SUMMARY" | jq -Rs .),
-            "group": "News",
-            "url": "https://news.google.com/"
-          }
-          EOF
+            -d "$PAYLOAD"
 
